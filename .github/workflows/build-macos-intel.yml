@@ -1,0 +1,53 @@
+name: Build macOS Intel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+    steps:
+      - name: 获取源码
+        uses: actions/checkout@v4
+
+      - name: 安装 Intel Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: 安装构建依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller>=6,<7"
+
+      - name: 打包应用
+        run: |
+          python -m PyInstaller --clean --noconfirm packaging/siwx-mac.spec
+
+      - name: 制作 Intel DMG
+        run: |
+          mkdir -p dist/intel-dmg
+          cp -R dist/stories-in-wx.app dist/intel-dmg/
+          ln -s /Applications dist/intel-dmg/Applications
+          hdiutil create \
+            -volname "SIWX Intel" \
+            -srcfolder dist/intel-dmg \
+            -ov -format UDZO \
+            dist/stories-in-wx-macos-x64.dmg
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIWX-macOS-Intel
+          path: dist/stories-in-wx-macos-x64.dmg
+          if-no-files-found: error
+          retention-days: 14
